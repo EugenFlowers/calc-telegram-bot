@@ -25,7 +25,7 @@ def calc_annuity_payment(amount: float, months: int, annual_rate: float) -> tupl
     if annual_rate < 0:
         raise ValueError("Ставка не может быть отрицательной")
 
-    monthly_rate = annual_rate / 12 / 100  # i
+    monthly_rate = annual_rate / 12 / 100
     if monthly_rate == 0:
         monthly_payment = amount / months
     else:
@@ -35,9 +35,12 @@ def calc_annuity_payment(amount: float, months: int, annual_rate: float) -> tupl
     return monthly_payment, total_payment, overpayment
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ОЧИЩАЕМ предыдущие данные и всегда начинаем заново
-    context.user_data.clear()
+async def global_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Глобальный /start — всегда работает и перезапускает на начальный экран."""
+    # Прерываем любой диалог
+    if context.user_data:
+        context.user_data.clear()
+    
     await update.message.reply_text(
         "💳 Кредитный калькулятор.\n\n"
         "Сначала введите сумму кредита в рублях (только число, без пробелов и знаков):"
@@ -119,8 +122,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
 
+    # ConversationHandler
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[CommandHandler("start", global_start)],  # Используем global_start
         states={
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, amount_handler)],
             MONTHS: [MessageHandler(filters.TEXT & ~filters.COMMAND, months_handler)],
@@ -129,10 +133,14 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    # ДОБАВЛЯЕМ глобальный обработчик /start с высоким приоритетом
+    app.add_handler(CommandHandler("start", global_start), group=-1)  # group=-1 = всегда первый
+
     app.add_handler(conv_handler)
     app.run_polling()
 
 
 if __name__ == "__main__":
     main()
+
 
