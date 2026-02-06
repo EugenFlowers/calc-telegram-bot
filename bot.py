@@ -36,10 +36,11 @@ def calc_annuity_payment(amount: float, months: int, annual_rate: float) -> tupl
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ОЧИЩАЕМ предыдущие данные и всегда начинаем заново
+    context.user_data.clear()
     await update.message.reply_text(
         "💳 Кредитный калькулятор.\n\n"
-        "Введите сумму кредита в рублях (только число, без пробелов и знаков):\n"
-        "💰 Например: 500000"
+        "Сначала введите сумму кредита в рублях (только число, без пробелов и знаков):"
     )
     return AMOUNT
 
@@ -51,14 +52,12 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("❌ Введите корректную сумму (положительное число). Пример: 500000")
+        await update.message.reply_text("❌ Введите корректную сумму (положительное число). Попробуйте ещё раз:")
         return AMOUNT
 
     context.user_data["amount"] = amount
     await update.message.reply_text(
-        f"✅ Сумма: {amount:,.2f} ₽\n\n"
-        "⏳ Теперь введите срок кредита в месяцах:\n"
-        "📅 Например: 12, 24, 36"
+        "⏳ Отлично!\nТеперь введите срок кредита в месяцах (например, 12, 24, 36):"
     )
     return MONTHS
 
@@ -70,14 +69,12 @@ async def months_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if months <= 0:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("❌ Введите целое число месяцев > 0. Пример: 24")
+        await update.message.reply_text("❌ Введите целое число месяцев > 0. Попробуйте ещё раз:")
         return MONTHS
 
     context.user_data["months"] = months
     await update.message.reply_text(
-        f"✅ Срок: {months} месяцев\n\n"
-        "📈 Введите годовую процентную ставку:\n"
-        "📊 Например: 15 или 19.9"
+        "📈 Теперь введите годовую процентную ставку (например, 15 или 19.9):"
     )
     return RATE
 
@@ -89,7 +86,7 @@ async def rate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if rate < 0:
             raise ValueError
     except ValueError:
-        await update.message.reply_text("❌ Введите корректную ставку (0 или больше). Пример: 15.5")
+        await update.message.reply_text("❌ Введите корректную ставку (0 или больше). Попробуйте ещё раз:")
         return RATE
 
     amount = context.user_data["amount"]
@@ -98,29 +95,24 @@ async def rate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         monthly_payment, total_payment, overpayment = calc_annuity_payment(amount, months, rate)
     except ValueError as e:
-        await update.message.reply_text(f"❌ Ошибка: {e}")
-        return AMOUNT  # Начать заново с суммы
+        await update.message.reply_text(f"Ошибка в данных: {e}")
+        return ConversationHandler.END
 
     await update.message.reply_text(
-        "✅ Результаты расчёта:\n\n"
-        f"💰 Сумма кредита: {amount:,.2f} ₽\n"
-        f"📅 Срок: {months} месяцев\n"
-        f"📊 Ставка: {rate:.2f} % годовых\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💳 Ежемесячный платёж: {monthly_payment:,.2f} ₽\n"
+        "✅ Результаты расчёта:\n"
+        f"• Сумма кредита: {amount:,.2f} ₽\n"
+        f"• Срок: {months} мес.\n"
+        f"• Ставка: {rate:.2f} % годовых\n\n"
+        f"💰 Ежемесячный платёж: {monthly_payment:,.2f} ₽\n"
         f"💵 Общая выплата: {total_payment:,.2f} ₽\n"
         f"📉 Переплата: {overpayment:,.2f} ₽\n\n"
-        "🎯 Хотите посчитать ещё раз?\n"
-        "Введите новую сумму или /cancel для выхода:"
+        "🔄 /start — новый расчёт"
     )
-    return AMOUNT  # 🔄 Возврат на ввод суммы — бесконечный цикл!
+    return ConversationHandler.END
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Диалог завершён.\n"
-        "Отправьте /start для нового расчёта!"
-    )
+    await update.message.reply_text("Диалог прерван. 🔄 /start — новый расчёт")
     return ConversationHandler.END
 
 
@@ -144,10 +136,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-    app.add_handler(conv_handler)
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
