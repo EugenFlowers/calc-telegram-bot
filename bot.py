@@ -7,12 +7,15 @@ from telegram.ext import (
     ContextTypes,
 )
 
+# Берём токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    print("❌ Добавьте BOT_TOKEN в Bothost.ru")
-    exit(1)
+    print("❌ Ошибка: не найден BOT_TOKEN в переменных окружения.")
+    raise SystemExit(1)
 
-# Вопросы анкеты (простая линейная логика)
+
+# ====== ЛОГИКА АНКЕТЫ ======
+
 QUESTIONS = {
     1: {
         "text": (
@@ -29,7 +32,7 @@ QUESTIONS = {
     2: {
         "text": (
             "❓ Вопрос 2/3:\n"
-            "<b>Есть ли текущие просрочки по кредитам?</b>"
+            "<b>Есть ли у вас текущие просрочки по кредитам?</b>"
         ),
         "buttons": [
             [InlineKeyboardButton("Нет ✅", callback_data="q2_no")],
@@ -40,7 +43,7 @@ QUESTIONS = {
     3: {
         "text": (
             "❓ Вопрос 3/3:\n"
-            "<b>Какой у вас примерный ежемесячный доход?</b>"
+            "<b>Какой у вас ежемесячный доход?</b>"
         ),
         "buttons": [
             [InlineKeyboardButton("> 100 000 ₽", callback_data="q3_high")],
@@ -52,33 +55,24 @@ QUESTIONS = {
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Всегда запускает анкету с первого вопроса."""
+    """Команда /start — всегда начинает опрос сначала."""
     context.user_data.clear()
     context.user_data["step"] = 1
-    await send_question(update, context, step=1)
 
+    q = QUESTIONS[1]
+    keyboard = InlineKeyboardMarkup(q["buttons"])
 
-async def send_question(update_or_query, context: ContextTypes.DEFAULT_TYPE, step: int):
-    """Отправка/обновление сообщения с вопросом."""
-    q = QUESTIONS[step]
-    markup = InlineKeyboardMarkup(q["buttons"])
-
-    # Если это первое сообщение — reply_text
-    if isinstance(update_or_query, Update) and update_or_query.message:
-        await update_or_query.message.reply_text(
-            q["text"], reply_markup=markup, parse_mode="HTML"
-        )
-    else:
-        query = update_or_query
-        await query.edit_message_text(
-            q["text"], reply_markup=markup, parse_mode="HTML"
-        )
+    await update.message.reply_text(
+        q["text"],
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
 
 
 async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Единственный обработчик ВСЕХ кнопок — работает с первого клика."""
+    """Единственный обработчик всех кнопок."""
     query = update.callback_query
-    await query.answer()  # обязательно
+    await query.answer()
 
     data = query.data
 
@@ -86,28 +80,40 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "restart":
         context.user_data.clear()
         context.user_data["step"] = 1
-        await send_question(query, context, step=1)
+        q = QUESTIONS[1]
+        keyboard = InlineKeyboardMarkup(q["buttons"])
+        await query.edit_message_text(
+            q["text"],
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
         return
 
-    # Текущий шаг
+    # Текущий шаг (по умолчанию 1)
     step = context.user_data.get("step", 1)
 
-    # Сохраняем ответ (если нужно — можно логировать в БД)
+    # Сохраняем ответ по шагу (answer_1, answer_2, answer_3)
     context.user_data[f"answer_{step}"] = data
 
-    # Если ещё есть вопросы — идём дальше
+    # Если ещё есть вопросы — идём к следующему
     if step < 3:
         step += 1
         context.user_data["step"] = step
-        await send_question(query, context, step=step)
+        q = QUESTIONS[step]
+        keyboard = InlineKeyboardMarkup(q["buttons"])
+
+        await query.edit_message_text(
+            q["text"],
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
         return
 
-    # Если это был последний вопрос — показываем результат
+    # Если это был последний вопрос — считаем результат
     await show_result(query, context)
 
 
 async def show_result(query, context: ContextTypes.DEFAULT_TYPE):
-    """Простейшая оценка по ответам."""
     a1 = context.user_data.get("answer_1")
     a2 = context.user_data.get("answer_2")
     a3 = context.user_data.get("answer_3")
@@ -157,13 +163,13 @@ async def show_result(query, context: ContextTypes.DEFAULT_TYPE):
             "Нужно улучшать историю и снижать просрочки."
         )
 
-    markup = InlineKeyboardMarkup(
+    keyboard = InlineKeyboardMarkup(
         [[InlineKeyboardButton("🔄 Пройти ещё раз", callback_data="restart")]]
     )
 
     await query.edit_message_text(
         text + "\n\nКоманда /start тоже перезапускает анкету.",
-        reply_markup=markup,
+        reply_markup=keyboard,
         parse_mode="HTML",
     )
 
@@ -171,8 +177,13 @@ async def show_result(query, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
 
-    # /start всегда срабатывает и показывает первый экран
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(on_button))
 
-    # Один обработчик для ВСЕХ inline‑кнопок
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
+
    
