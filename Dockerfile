@@ -6,8 +6,10 @@ ENV PIP_ROOT_USER_ACTION=ignore \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+
 COPY requirements.txt .
-RUN pip install --quiet -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
 CMD ["python", "bot.py"]
