@@ -170,7 +170,7 @@ async def show_result(query, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     await query.edit_message_text(
-        text + "\n\n<b>Оформить</b> — перейдите по ссылке ниже.\n\nКоманда /start тоже перезапускает анкету.",
+        text + "\n\n<b>ОФОРМИТЬ</b> — перейдите по ссылке ниже.\n\nКоманда /start тоже перезапускает анкету.",
         reply_markup=keyboard,
         parse_mode="HTML",
     )
